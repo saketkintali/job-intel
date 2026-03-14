@@ -45,7 +45,7 @@ Upload your resume (or search by job title) to get matched with real job listing
 ### 1. Clone the repo
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/saketkintali/job-intel.git
 cd job-intel
 ```
 
@@ -66,19 +66,24 @@ pip install -r requirements.txt
 
 ### 3. Configure API keys
 
-Open `backend/main.py` and update these constants near the top:
-
-```python
-# Claude / OpenClaw
-CLAUDE_API_URL = "http://127.0.0.1:18789/v1/responses"
-GATEWAY_TOKEN  = "your-openclaw-gateway-token"
-
-# Adzuna — get from https://developer.adzuna.com/
-ADZUNA_APP_ID  = "your-app-id"
-ADZUNA_APP_KEY = "your-app-key"
+```bash
+cd backend
+cp .env.example .env   # Windows: copy .env.example .env
 ```
 
-> **Coming soon:** `.env` file support so you never touch `main.py` for secrets.
+Open `backend/.env` and fill in your values:
+
+```env
+# Claude / OpenClaw local gateway
+CLAUDE_API_URL=http://127.0.0.1:18789/v1/responses
+GATEWAY_TOKEN=your-openclaw-gateway-token
+
+# Adzuna Jobs API — free account at https://developer.adzuna.com/
+ADZUNA_APP_ID=your-adzuna-app-id
+ADZUNA_APP_KEY=your-adzuna-app-key
+```
+
+> The `.env` file is listed in `.gitignore` and will never be committed.
 
 ### 4. Frontend
 
@@ -178,7 +183,7 @@ docker compose up --build
 ## Roadmap
 
 - [ ] SQLite persistence for resume profiles
-- [ ] `.env` file support for secrets
+- [x] `.env` file support for secrets
 - [ ] Adzuna pagination (currently page 1 only)
 - [ ] More interview question sources
 - [ ] Save/bookmark companies

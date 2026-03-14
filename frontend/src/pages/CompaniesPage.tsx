@@ -24,21 +24,23 @@ export default function CompaniesPage() {
   const [role, setRole] = useState(initialRole);
   const [location, setLocation] = useState(initialLocation);
   const [salaryMin, setSalaryMin] = useState<string>("");
+  const [radius, setRadius] = useState<string>("25");
 
   useEffect(() => {
     if (!state?.profileId) {
       navigate("/");
       return;
     }
-    fetchJobs(state.profileId, initialRole, initialLocation, "");
+    fetchJobs(state.profileId, initialRole, initialLocation, "", "25");
   }, []);
 
-  async function fetchJobs(profileId: string, searchRole: string, searchLocation: string, minSalary: string) {
+  async function fetchJobs(profileId: string, searchRole: string, searchLocation: string, minSalary: string, searchRadius: string) {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ profileId, role: searchRole, location: searchLocation });
       if (minSalary) params.set("salary_min", minSalary);
+      if (searchRadius) params.set("radius", searchRadius);
       const res = await fetch(`/api/companies?${params}`);
       if (!res.ok) throw new Error("Failed to fetch jobs");
       const data = await res.json();
@@ -52,7 +54,7 @@ export default function CompaniesPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (state?.profileId) fetchJobs(state.profileId, role, location, salaryMin);
+    if (state?.profileId) fetchJobs(state.profileId, role, location, salaryMin, radius);
   };
 
   return (
@@ -85,6 +87,16 @@ export default function CompaniesPage() {
           placeholder="Location (e.g. Seattle, WA)"
           className="flex-1 min-w-[140px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
+        <select
+          value={radius}
+          onChange={(e) => setRadius(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+        >
+          <option value="10">10 mi</option>
+          <option value="25">25 mi</option>
+          <option value="50">50 mi</option>
+          <option value="100">100 mi</option>
+        </select>
         <select
           value={salaryMin}
           onChange={(e) => setSalaryMin(e.target.value)}

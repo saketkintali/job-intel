@@ -5,6 +5,7 @@ backend/*.pyc
 backend/*.pyo
 *.egg-info/
 .env
+backend/.env
 
 # Node
 frontend/node_modules/

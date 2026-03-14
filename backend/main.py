@@ -1,6 +1,7 @@
 import asyncio
 import io
 import json
+import os
 import re
 import uuid
 from typing import Optional
@@ -8,8 +9,11 @@ from typing import Optional
 import httpx
 import pdfplumber
 import PyPDF2
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv()
 
 app = FastAPI(title="Job Intelligence Platform")
 
@@ -24,10 +28,10 @@ app.add_middleware(
 # In-memory store: profileId -> parsed resume data
 profiles: dict = {}
 
-CLAUDE_API_URL = "http://127.0.0.1:18789/v1/responses"
-GATEWAY_TOKEN = "d13f5ea80982e25997a39f0450359bd9a64a40e693eadd2b"
-ADZUNA_APP_ID = "d39fe2af"
-ADZUNA_APP_KEY = "6f131b7d743ef4eb420e2083bef81e79"
+CLAUDE_API_URL = os.environ.get("CLAUDE_API_URL", "http://127.0.0.1:18789/v1/responses")
+GATEWAY_TOKEN = os.environ.get("GATEWAY_TOKEN", "")
+ADZUNA_APP_ID = os.environ.get("ADZUNA_APP_ID", "")
+ADZUNA_APP_KEY = os.environ.get("ADZUNA_APP_KEY", "")
 ADZUNA_BASE = "https://api.adzuna.com/v1/api/jobs/us/search/1"
 THEMUSE_BASE = "https://www.themuse.com/api/public/jobs"
 
@@ -166,7 +170,7 @@ async def debug_resume(file: UploadFile = File(...)):
 
 
 @app.get("/api/companies")
-async def get_companies(profileId: str, role: Optional[str] = None, location: Optional[str] = "Seattle, WA", salary_min: Optional[int] = None):
+async def get_companies(profileId: str, role: Optional[str] = None, location: Optional[str] = "Seattle, WA", salary_min: Optional[int] = None, radius: Optional[int] = 25):
     if profileId != "manual" and profileId not in profiles:
         raise HTTPException(status_code=404, detail="Profile not found")
 
@@ -186,7 +190,7 @@ async def get_companies(profileId: str, role: Optional[str] = None, location: Op
                 "what": search_role,
                 "where": location or "Seattle",
                 "sort_by": "relevance",
-                "distance": 25,
+                "distance": radius or 25,
             }
             if salary_min:
                 adzuna_params["salary_min"] = salary_min
