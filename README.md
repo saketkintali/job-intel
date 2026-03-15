@@ -8,7 +8,7 @@ Upload your resume (or search by job title) to get matched with real job listing
 
 - **Resume upload** → Claude AI extracts your skills and target roles
 - **Job title search** → skip the resume, search directly
-- **Company grid** → real listings from Adzuna and Greenhouse (20 top tech companies), filtered by location and optional salary floor
+- **Company grid** → real listings from Adzuna and Greenhouse (20 top tech companies), filtered by location, radius, salary floor, and remote/onsite preference
 - **Per-company dashboard** with 4 tiles:
   - **Interview Questions** — real LeetCode problems (coding) + company-specific system design & behavioral
   - **Salary Ranges** — min / median / max estimated by role and company tier
@@ -191,7 +191,6 @@ docker compose up --build
 - **LeetCode coding questions** are filtered by topic tag, not company-specific (company tagging requires LeetCode Premium)
 - **Salary and round data** are estimated based on role type — not sourced from a live API
 - **Resume parsing** works best with text-based PDFs; scanned/image PDFs may not extract correctly
-- **Greenhouse seniority filtering** — searching "Senior Software Engineer" may return mid/junior roles because seniority words are excluded from the keyword fallback
 
 ---
 
@@ -200,7 +199,7 @@ docker compose up --build
 - [ ] SQLite persistence for resume profiles
 - [x] `.env` file support for secrets
 - [x] Greenhouse ATS as a no-auth job source
-- [ ] Fix seniority filtering for Greenhouse results
+- [x] Fix seniority filtering for Greenhouse results
 - [ ] Adzuna pagination (currently page 1 only)
 - [ ] More interview question sources
 - [ ] Save/bookmark companies
