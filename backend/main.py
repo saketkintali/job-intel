@@ -121,7 +121,15 @@ async def fetch_greenhouse_jobs(role: str, location: str = "") -> list[dict]:
                     display_location = remote_segments[0]
                     is_remote = True
             else:
-                is_remote = "remote" in job_location.lower()
+                loc_lower = job_location.lower()
+                if "remote" in loc_lower:
+                    NON_US = ["brazil", "india", "canada", "uk", "europe", "latam", "latin",
+                              "australia", "austria", "germany", "france", "mexico", "argentina"]
+                    if any(x in loc_lower for x in NON_US):
+                        continue
+                    is_remote = True
+                else:
+                    is_remote = False
 
             results.append({
                 "id": str(job.get("id", uuid.uuid4())),
@@ -359,8 +367,15 @@ async def get_companies(profileId: str, role: Optional[str] = None, location: Op
     def is_city_match(job) -> bool:
         return any(city in loc.get("name", "").lower() for loc in job.get("locations", []))
 
+    NON_US_TERMS = {"brazil", "india", "canada", "uk", "europe", "latam", "latin",
+                    "australia", "austria", "germany", "france", "mexico", "argentina"}
+
     def is_remote(job) -> bool:
-        return any("remote" in loc.get("name", "").lower() or "flexible" in loc.get("name", "").lower() for loc in job.get("locations", []))
+        locs = [loc.get("name", "").lower() for loc in job.get("locations", [])]
+        return any(
+            ("remote" in l or "flexible" in l) and not any(x in l for x in NON_US_TERMS)
+            for l in locs
+        )
 
     city_jobs = [j for j in matched if is_city_match(j)] if city else []
     remote_jobs = [j for j in matched if is_remote(j)]
