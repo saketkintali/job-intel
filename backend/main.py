@@ -34,6 +34,99 @@ ADZUNA_APP_ID = os.environ.get("ADZUNA_APP_ID", "")
 ADZUNA_APP_KEY = os.environ.get("ADZUNA_APP_KEY", "")
 ADZUNA_BASE = "https://api.adzuna.com/v1/api/jobs/us/search/1"
 THEMUSE_BASE = "https://www.themuse.com/api/public/jobs"
+GREENHOUSE_BASE = "https://boards-api.greenhouse.io/v1/boards/{company}/jobs"
+
+# Top tech companies known to use Greenhouse (no auth required)
+GREENHOUSE_COMPANIES = [
+    "airbnb", "anthropic", "brex", "coinbase", "databricks",
+    "discord", "figma", "instacart", "lyft", "stripe",
+    "vercel", "benchling", "asana", "robinhood", "twitch",
+    "dropbox", "zendesk", "hubspot", "intercom", "gusto",
+]
+
+
+async def fetch_greenhouse_jobs(role: str, location: str = "") -> list[dict]:
+    """Fetch jobs from Greenhouse ATS (free, no auth). Filters by role keyword."""
+    role_lower = role.lower().strip()
+    # Use full phrase first; fall back to significant keywords (skip generic words)
+    GENERIC = {"engineer", "developer", "manager", "lead", "senior", "junior", "staff", "principal"}
+    keywords = [kw.lower() for kw in role.split() if len(kw) > 2 and kw.lower() not in GENERIC]
+    city = location.split(",")[0].strip().lower() if location else ""
+    results = []
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        tasks = [
+            client.get(GREENHOUSE_BASE.format(company=c))
+            for c in GREENHOUSE_COMPANIES
+        ]
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for company, resp in zip(GREENHOUSE_COMPANIES, responses):
+        if isinstance(resp, Exception) or resp.status_code != 200:
+            continue
+        try:
+            jobs = resp.json().get("jobs", [])
+        except Exception:
+            continue
+
+        for job in jobs:
+            title = job.get("title", "").lower()
+            # Filter by role: exact phrase match first, then keyword fallback
+            if role_lower not in title and (not keywords or not any(kw in title for kw in keywords)):
+                continue
+            job_location = job.get("location", {}).get("name", "")
+            # Filter by city: only include jobs where city matches
+            # "Remote - USA" or "Remote, USA" passes only if no city specified
+            display_location = job_location
+            is_remote = False
+
+            if city:
+                loc_lower = job_location.lower()
+                # Split multi-city strings like "San Francisco, CA | Seattle, WA"
+                segments = [s.strip() for s in job_location.replace(";", "|").split("|")]
+                city_segments = [s for s in segments if city in s.lower()]
+                remote_segments = [s for s in segments if "remote" in s.lower()]
+
+                city_match = len(city_segments) > 0
+                remote_usa = len(remote_segments) > 0 and any(
+                    x in " ".join(remote_segments).lower()
+                    for x in ["usa", "united states", "america", "- us", "-us", ", us"]
+                ) and not any(
+                    x in " ".join(remote_segments).lower()
+                    for x in ["brazil", "india", "canada", "uk", "europe", "latam", "latin", "australia", "austria"]
+                )
+
+                if not city_match and not remote_usa:
+                    continue
+
+                # Clean up display: if multi-city mess, just show the searched city cleanly
+                OTHER_CITIES = ["san francisco", "new york", "los angeles", "chicago", "boston",
+                                "austin", "denver", "miami", "atlanta", "portland", "phoenix"]
+                if city_match:
+                    candidate = city_segments[0] if len(city_segments) == 1 else " | ".join(city_segments)
+                    # If the candidate still has other cities in it, just use the search location
+                    has_other_city = any(oc in candidate.lower() for oc in OTHER_CITIES if oc != city)
+                    if has_other_city or len(candidate) > 40 or "|" in candidate:
+                        display_location = location.strip() if location else city.title()
+                    else:
+                        display_location = candidate
+                elif remote_usa:
+                    display_location = remote_segments[0]
+                    is_remote = True
+            else:
+                is_remote = "remote" in job_location.lower()
+
+            results.append({
+                "id": str(job.get("id", uuid.uuid4())),
+                "company": company.capitalize(),
+                "title": job.get("title", ""),
+                "location": display_location,
+                "url": job.get("absolute_url", "#"),
+                "remote": is_remote,
+                "source": "Greenhouse",
+            })
+
+    return results
 
 
 
@@ -180,8 +273,13 @@ async def get_companies(profileId: str, role: Optional[str] = None, location: Op
         profile = profiles[profileId]
         search_role = role or (profile.get("roles") or ["software engineer"])[0]
 
-    # ── Adzuna (preferred — real location + keyword search) ──────────────
-    if ADZUNA_APP_ID != "REPLACE_WITH_APP_ID":
+    # ── Adzuna + Greenhouse (run in parallel) ────────────────────────────
+    adzuna_jobs = []
+    greenhouse_task = asyncio.create_task(
+        fetch_greenhouse_jobs(search_role, location or "Seattle")
+    )
+
+    if ADZUNA_APP_ID and ADZUNA_APP_ID not in ("REPLACE_WITH_APP_ID", ""):
         async with httpx.AsyncClient(timeout=30) as client:
             adzuna_params = {
                 "app_id": ADZUNA_APP_ID,
@@ -196,22 +294,31 @@ async def get_companies(profileId: str, role: Optional[str] = None, location: Op
                 adzuna_params["salary_min"] = salary_min
             resp = await client.get(ADZUNA_BASE, params=adzuna_params)
         if resp.status_code == 200:
-            jobs = []
-            seen = set()
             for job in resp.json().get("results", []):
-                key = (job.get("company", {}).get("display_name", ""), job.get("title", ""))
-                if key in seen:
-                    continue
-                seen.add(key)
-                jobs.append({
+                adzuna_jobs.append({
                     "id": str(job.get("id", uuid.uuid4())),
                     "company": job.get("company", {}).get("display_name", "Unknown"),
                     "title": job.get("title", ""),
                     "location": job.get("location", {}).get("display_name", ""),
                     "url": job.get("redirect_url", "#"),
                     "remote": False,
+                    "source": "Adzuna",
                 })
-            return jobs
+
+    greenhouse_jobs = await greenhouse_task
+
+    # ── Merge + deduplicate by (company, title) ───────────────────────────
+    seen: set = set()
+    merged: list = []
+    for job in adzuna_jobs + greenhouse_jobs:
+        key = (job["company"].lower().strip(), job["title"].lower().strip())
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(job)
+
+    if merged:
+        return merged
 
     # ── The Muse fallback ─────────────────────────────────────────────────
     keywords = extract_keywords(search_role)
