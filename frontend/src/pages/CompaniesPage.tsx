@@ -7,6 +7,7 @@ interface Job {
   title: string;
   location: string;
   url: string;
+  remote?: boolean;
 }
 
 export default function CompaniesPage() {
@@ -25,6 +26,7 @@ export default function CompaniesPage() {
   const [location, setLocation] = useState(initialLocation);
   const [salaryMin, setSalaryMin] = useState<string>("");
   const [radius, setRadius] = useState<string>("25");
+  const [workType, setWorkType] = useState<"all" | "remote" | "onsite">("all");
 
   useEffect(() => {
     if (!state?.profileId) {
@@ -110,6 +112,15 @@ export default function CompaniesPage() {
           <option value="180000">$180k+</option>
           <option value="200000">$200k+</option>
         </select>
+        <select
+          value={workType}
+          onChange={(e) => setWorkType(e.target.value as "all" | "remote" | "onsite")}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+        >
+          <option value="all">All types</option>
+          <option value="remote">Remote only</option>
+          <option value="onsite">In-person only</option>
+        </select>
         <button
           type="submit"
           className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
@@ -135,9 +146,18 @@ export default function CompaniesPage() {
         <p className="text-center text-gray-500 py-16">No jobs found. Try a different role.</p>
       )}
 
-      {!loading && jobs.length > 0 && (
+      {!loading && jobs.length > 0 && (() => {
+        const filtered = jobs.filter((job) => {
+          if (workType === "remote") return job.remote === true;
+          if (workType === "onsite") return job.remote !== true;
+          return true;
+        });
+        return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {jobs.map((job) => (
+          {filtered.length === 0 && (
+            <p className="col-span-full text-center text-gray-500 py-16">No jobs match this filter.</p>
+          )}
+          {filtered.map((job) => (
             <div key={job.id} className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-blue-600">{job.company}</span>
@@ -172,7 +192,8 @@ export default function CompaniesPage() {
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
