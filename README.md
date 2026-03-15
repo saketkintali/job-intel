@@ -6,7 +6,7 @@ Upload your resume (or search by job title) to get matched with real job listing
 
 ## What It Does
 
-- **Resume upload** → Claude AI extracts your skills and target roles
+- **Resume upload** → AI extracts your skills and target roles
 - **Job title search** → skip the resume, search directly
 - **Company grid** → real listings from Adzuna and Greenhouse (20 top tech companies), filtered by location, radius, salary floor, and remote/onsite preference
 - **Per-company dashboard** with 4 tiles:
@@ -125,7 +125,7 @@ Open [http://localhost:5173](http://localhost:5173)
 | Endpoint | Method | Description |
 |---|---|---|
 | `/api/resume/upload` | POST | Upload PDF → returns `profileId`, extracted skills/roles |
-| `/api/resume/debug` | POST | Debug endpoint — returns raw extracted text + Claude output |
+| `/api/resume/debug` | POST | Debug endpoint — returns raw extracted text and parsing method |
 | `/api/companies` | GET | Job listings. Params: `profileId`, `role`, `location`, `salary_min`, `radius` (miles, default 25) |
 | `/api/interviews` | GET | Interview questions. Params: `company`, `role` |
 | `/api/salary` | GET | Salary ranges. Params: `company`, `role` |
