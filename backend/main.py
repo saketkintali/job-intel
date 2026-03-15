@@ -28,8 +28,8 @@ app.add_middleware(
 # In-memory store: profileId -> parsed resume data
 profiles: dict = {}
 
-CLAUDE_API_URL = os.environ.get("CLAUDE_API_URL", "http://127.0.0.1:18789/v1/responses")
-GATEWAY_TOKEN = os.environ.get("GATEWAY_TOKEN", "")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ADZUNA_APP_ID = os.environ.get("ADZUNA_APP_ID", "")
 ADZUNA_APP_KEY = os.environ.get("ADZUNA_APP_KEY", "")
 ADZUNA_BASE = "https://api.adzuna.com/v1/api/jobs/us/search/1"
@@ -179,24 +179,37 @@ async def upload_resume(file: UploadFile = File(...)):
         f"Resume: {text[:8000]}"
     )
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            CLAUDE_API_URL,
-            json={
-                "model": "openclaw:main",
-                "input": [{"type": "message", "role": "user", "content": prompt}]
-            },
-            headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"}
-        )
-        resp.raise_for_status()
+    if not OPENAI_API_KEY and not ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="No AI key configured — set OPENAI_API_KEY or ANTHROPIC_API_KEY in backend/.env")
 
-    data = resp.json()
-    raw = ""
-    for item in data.get("output", []):
-        for c in item.get("content", []):
-            if c.get("type") == "output_text":
-                raw = c.get("text", "")
-                break
+    async with httpx.AsyncClient(timeout=60) as client:
+        if OPENAI_API_KEY:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0,
+                },
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+            )
+            resp.raise_for_status()
+            raw = resp.json()["choices"][0]["message"]["content"]
+        else:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                json={
+                    "model": "claude-haiku-4-5-20251001",
+                    "max_tokens": 1024,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                headers={
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                },
+            )
+            resp.raise_for_status()
+            raw = resp.json()["content"][0]["text"]
 
     # Parse JSON from Claude response
     parsed = {"skills": [], "roles": [], "yearsExp": 0}
@@ -255,25 +268,10 @@ async def debug_resume(file: UploadFile = File(...)):
     if not text.strip():
         return {"extracted_text": "", "method": "none", "claude_raw": "", "parsed": {}}
 
-    prompt = (
-        "Extract job titles from this resume. Return JSON: { skills: string[], roles: string[], yearsExp: number }. "
-        f"Resume: {text[:4000]}"
-    )
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(CLAUDE_API_URL,
-            json={"model": "openclaw:main", "input": [{"type": "message", "role": "user", "content": prompt}]},
-            headers={"Authorization": f"Bearer {GATEWAY_TOKEN}"})
-    raw = ""
-    for item in resp.json().get("output", []):
-        for c in item.get("content", []):
-            if c.get("type") == "output_text":
-                raw = c.get("text", "")
-
     return {
         "extracted_text_preview": text[:1000],
         "extracted_length": len(text),
         "method": method,
-        "claude_raw": raw,
     }
 
 

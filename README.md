@@ -24,7 +24,7 @@ Upload your resume (or search by job title) to get matched with real job listing
 |---|---|
 | Backend | Python 3.12, FastAPI, uvicorn |
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS |
-| AI | Claude via OpenClaw local gateway |
+| AI | OpenAI (gpt-4o-mini) or Claude (claude-haiku, via Anthropic API) |
 | Jobs API | Adzuna (optional) + Greenhouse ATS (no auth), The Muse (fallback) |
 | Interview data | LeetCode GraphQL (public, no auth) |
 | PDF parsing | pdfplumber (primary), PyPDF2 (fallback) |
@@ -35,7 +35,7 @@ Upload your resume (or search by job title) to get matched with real job listing
 
 - Python 3.12+
 - Node.js 18+
-- OpenClaw running locally (for resume parsing via Claude)
+- An [OpenAI API key](https://platform.openai.com/api-keys) **or** an [Anthropic API key](https://console.anthropic.com/)
 - An [Adzuna API account](https://developer.adzuna.com/) *(optional — Greenhouse jobs load without it)*
 
 ---
@@ -74,11 +74,11 @@ cp .env.example .env   # Windows: copy .env.example .env
 Open `backend/.env` and fill in your values:
 
 ```env
-# Claude / OpenClaw local gateway
-CLAUDE_API_URL=http://127.0.0.1:18789/v1/responses
-GATEWAY_TOKEN=your-openclaw-gateway-token
+# AI provider — add one (OpenAI is used if both are set)
+OPENAI_API_KEY=your-openai-api-key
+# ANTHROPIC_API_KEY=your-anthropic-api-key
 
-# Adzuna Jobs API — free account at https://developer.adzuna.com/
+# Optional — Adzuna Jobs API (free account at https://developer.adzuna.com/)
 # Leave blank to rely on Greenhouse + The Muse only
 ADZUNA_APP_ID=your-adzuna-app-id
 ADZUNA_APP_KEY=your-adzuna-app-key
@@ -181,7 +181,7 @@ docker compose up --build
 - Frontend: [http://localhost:5173](http://localhost:5173)
 - Backend: [http://localhost:8000](http://localhost:8000)
 
-> Set `GATEWAY_TOKEN`, `ADZUNA_APP_ID`, and `ADZUNA_APP_KEY` as environment variables or in a `.env` file at the repo root before running Docker.
+> Set your AI key (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`) plus optional `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` as environment variables or in a `.env` file at the repo root before running Docker.
 
 ---
 
