@@ -48,8 +48,11 @@ GREENHOUSE_COMPANIES = [
 async def fetch_greenhouse_jobs(role: str, location: str = "") -> list[dict]:
     """Fetch jobs from Greenhouse ATS (free, no auth). Filters by role keyword."""
     role_lower = role.lower().strip()
-    # Use full phrase first; fall back to significant keywords (skip generic words)
-    GENERIC = {"engineer", "developer", "manager", "lead", "senior", "junior", "staff", "principal"}
+    # Capture any seniority the user specified so we can enforce it in the fallback
+    SENIORITY_WORDS = {"senior", "sr", "junior", "jr", "staff", "principal", "lead"}
+    searched_seniority = {w for w in role_lower.split() if w in SENIORITY_WORDS}
+    # Keyword fallback: strip seniority + generic structural words, keep domain nouns
+    GENERIC = {"engineer", "developer", "manager", "lead", "senior", "junior", "staff", "principal", "sr", "jr"}
     keywords = [kw.lower() for kw in role.split() if len(kw) > 2 and kw.lower() not in GENERIC]
     city = location.split(",")[0].strip().lower() if location else ""
     results = []
@@ -72,8 +75,12 @@ async def fetch_greenhouse_jobs(role: str, location: str = "") -> list[dict]:
         for job in jobs:
             title = job.get("title", "").lower()
             # Filter by role: exact phrase match first, then keyword fallback
-            if role_lower not in title and (not keywords or not any(kw in title for kw in keywords)):
-                continue
+            if role_lower not in title:
+                if not keywords or not any(kw in title for kw in keywords):
+                    continue
+                # Honour seniority intent: if user searched "senior ...", reject non-senior titles
+                if searched_seniority and not any(s in title for s in searched_seniority):
+                    continue
             job_location = job.get("location", {}).get("name", "")
             # Filter by city: only include jobs where city matches
             # "Remote - USA" or "Remote, USA" passes only if no city specified
